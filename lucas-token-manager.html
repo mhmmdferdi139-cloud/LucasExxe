@@ -1,0 +1,699 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LUCAS — Token Manager</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Share+Tech+Mono&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#000;--bg2:#030a10;--surface:rgba(5,20,35,0.88);--surface2:rgba(8,28,48,0.92);
+  --border:rgba(0,200,255,0.15);--border2:rgba(0,200,255,0.35);
+  --cyan:#00f5ff;--cyan2:#00bcd4;--gold:#ffd700;--gold2:#ffb300;
+  --green:#00ff88;--green2:#00c853;--red:#ff1744;--purple:#7c4dff;
+  --text:#e0f7fa;--text2:#b2ebf2;--muted:#3a5f6f;
+  --gc:0 0 25px rgba(0,245,255,0.5);--gg:0 0 25px rgba(0,255,136,0.5);--go:0 0 25px rgba(255,215,0,0.5);
+}
+html,body{height:100%;overflow-x:hidden}
+body{background:#000;color:var(--text);font-family:'Rajdhani',sans-serif;min-height:100vh;position:relative}
+
+/* ══ CANVAS BG ══ */
+#bgCanvas{position:fixed;inset:0;z-index:0}
+#fxCanvas{position:fixed;inset:0;z-index:1;pointer-events:none}
+
+/* ══ EFFECTS ══ */
+.scanlines{position:fixed;inset:0;z-index:2;pointer-events:none;background:repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(0,0,0,0.12) 3px,rgba(0,0,0,0.12) 4px)}
+.vignette{position:fixed;inset:0;z-index:2;pointer-events:none;background:radial-gradient(ellipse at center,transparent 35%,rgba(0,0,0,0.75) 100%)}
+.glitch-h{position:fixed;inset:0;z-index:3;pointer-events:none;opacity:0;mix-blend-mode:screen;background:linear-gradient(transparent,rgba(0,245,255,0.04),transparent);animation:gh 7s infinite}
+@keyframes gh{0%,94%,100%{opacity:0;transform:translateY(0)}95%{opacity:1;transform:translateY(-20px)}96%{opacity:0;transform:translateY(15px)}97%{opacity:1;transform:translateY(0)}}
+
+/* HUD corners */
+.hc{position:fixed;z-index:4;pointer-events:none;width:50px;height:50px}
+.hc.tl{top:0;left:0;border-top:2px solid rgba(0,245,255,0.5);border-left:2px solid rgba(0,245,255,0.5)}
+.hc.tr{top:0;right:0;border-top:2px solid rgba(0,245,255,0.5);border-right:2px solid rgba(0,245,255,0.5)}
+.hc.bl{bottom:24px;left:0;border-bottom:2px solid rgba(0,245,255,0.3);border-left:2px solid rgba(0,245,255,0.3)}
+.hc.br{bottom:24px;right:0;border-bottom:2px solid rgba(0,245,255,0.3);border-right:2px solid rgba(0,245,255,0.3)}
+
+/* HUD bar */
+.hud{position:fixed;bottom:0;left:0;right:0;z-index:20;height:22px;background:rgba(0,0,0,0.7);border-top:1px solid rgba(0,245,255,0.08);display:flex;align-items:center;gap:20px;padding:0 14px;font-family:'Share Tech Mono',monospace;font-size:9px;color:rgba(0,245,255,0.35);letter-spacing:1px}
+.hdot{width:5px;height:5px;border-radius:50%;background:var(--green);box-shadow:0 0 6px var(--green);animation:hblink 2s infinite}
+@keyframes hblink{0%,100%{opacity:1}50%{opacity:0.25}}
+.htime{margin-left:auto;color:rgba(0,245,255,0.3)}
+
+/* ══════════ LOADING ══════════ */
+#loadingOverlay{position:fixed;inset:0;z-index:1000;background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0}
+
+.lg-wrap{position:relative;text-align:center}
+.lg-title{
+  font-family:'Orbitron',monospace;font-size:clamp(52px,13vw,110px);font-weight:900;
+  color:var(--cyan);letter-spacing:10px;
+  text-shadow:0 0 30px rgba(0,245,255,0.7),0 0 80px rgba(0,245,255,0.3);
+  position:relative;animation:lgPulse 2s ease-in-out infinite alternate;
+}
+@keyframes lgPulse{from{text-shadow:0 0 30px rgba(0,245,255,0.7),0 0 80px rgba(0,245,255,0.3)}to{text-shadow:0 0 50px rgba(0,245,255,1),0 0 120px rgba(0,245,255,0.5)}}
+
+/* glitch layers */
+.lg-title::before{content:'LUCAS';position:absolute;inset:0;color:#ff0040;left:4px;animation:lg1 4s infinite;clip-path:polygon(0 15%,100% 15%,100% 35%,0 35%)}
+.lg-title::after{content:'LUCAS';position:absolute;inset:0;color:#00f5ff;left:-4px;animation:lg2 4s infinite;clip-path:polygon(0 65%,100% 65%,100% 85%,0 85%)}
+@keyframes lg1{0%,88%,100%{opacity:0;transform:translate(0)}89%{opacity:0.9;transform:translate(-6px,3px)}91%{opacity:0;transform:translate(4px,-2px)}93%{opacity:0.7;transform:translate(0)}}
+@keyframes lg2{0%,91%,100%{opacity:0;transform:translate(0)}92%{opacity:0.9;transform:translate(6px,-4px)}94%{opacity:0;transform:translate(-4px,3px)}96%{opacity:0.8;transform:translate(0)}}
+
+.lg-sub{font-family:'Share Tech Mono',monospace;font-size:11px;color:rgba(0,245,255,0.3);letter-spacing:7px;margin-top:6px;margin-bottom:44px}
+.lg-bar-w{width:280px;height:2px;background:rgba(0,245,255,0.08);overflow:hidden;position:relative}
+.lg-bar{height:100%;width:0;background:linear-gradient(90deg,transparent,var(--cyan),var(--purple));box-shadow:0 0 12px var(--cyan);animation:lgBar 2.2s cubic-bezier(0.4,0,0.2,1) forwards}
+@keyframes lgBar{0%{width:0}70%{width:80%}90%{width:95%}100%{width:100%}}
+.lg-bar-w::after{content:'';position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.4),transparent);width:60px;animation:lgShine 2s linear infinite}
+@keyframes lgShine{from{transform:translateX(-60px)}to{transform:translateX(340px)}}
+.lg-pct{font-family:'Share Tech Mono',monospace;font-size:11px;color:rgba(0,245,255,0.4);margin-top:10px;letter-spacing:2px}
+.lg-log{font-family:'Share Tech Mono',monospace;font-size:9px;color:rgba(0,245,255,0.2);margin-top:22px;width:300px;text-align:left}
+.lg-log div{margin-bottom:3px;animation:llIn 0.3s ease both}
+@keyframes llIn{from{opacity:0;transform:translateX(-8px)}to{opacity:1}}
+
+/* ══════════ LOGIN ══════════ */
+#loginPage{position:fixed;inset:0;z-index:500;display:none;align-items:center;justify-content:center}
+#loginPage::before{content:'';position:absolute;inset:0;background:rgba(0,3,12,0.55);backdrop-filter:blur(3px)}
+
+.lw{position:relative;z-index:1;width:100%;max-width:430px;padding:18px;animation:lwIn 0.7s cubic-bezier(0.22,1,0.36,1) both}
+@keyframes lwIn{from{opacity:0;transform:translateY(50px) scale(0.88)}to{opacity:1;transform:translateY(0) scale(1)}}
+
+.lh{text-align:center;margin-bottom:28px}
+.hex-logo{width:88px;height:88px;margin:0 auto 18px;position:relative}
+.hex-in{
+  width:88px;height:88px;
+  background:linear-gradient(135deg,rgba(0,245,255,0.15),rgba(124,77,255,0.2));
+  clip-path:polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%);
+  display:flex;align-items:center;justify-content:center;
+  font-family:'Orbitron',monospace;font-size:30px;font-weight:900;color:var(--cyan);
+  box-shadow:0 0 30px rgba(0,245,255,0.25),inset 0 0 20px rgba(0,245,255,0.05);
+  animation:hxBreath 3s ease-in-out infinite;z-index:1;position:relative;
+}
+@keyframes hxBreath{0%,100%{box-shadow:0 0 30px rgba(0,245,255,0.25),inset 0 0 20px rgba(0,245,255,0.05)}50%{box-shadow:0 0 60px rgba(0,245,255,0.5),inset 0 0 30px rgba(0,245,255,0.1)}}
+.hex-r1,.hex-r2{position:absolute;clip-path:polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%)}
+.hex-r1{inset:-10px;border:1px solid rgba(0,245,255,0.15);animation:rr 7s linear infinite}
+.hex-r2{inset:-22px;border:1px solid rgba(124,77,255,0.1);animation:rr 12s linear infinite reverse}
+@keyframes rr{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+
+.ln{font-family:'Orbitron',monospace;font-size:36px;font-weight:900;letter-spacing:8px;color:var(--cyan);text-shadow:0 0 25px rgba(0,245,255,0.5)}
+.ln::after{content:'TOKEN MANAGER';display:block;font-size:9px;letter-spacing:6px;color:rgba(0,245,255,0.3);margin-top:5px;text-shadow:none}
+
+.lcard{background:var(--surface);border:1px solid rgba(0,245,255,0.25);border-radius:3px;padding:30px;position:relative;overflow:hidden;backdrop-filter:blur(24px);box-shadow:0 0 60px rgba(0,100,200,0.1),inset 0 0 1px rgba(0,245,255,0.2)}
+.lcard::before,.lcard::after{content:'';position:absolute;width:22px;height:22px}
+.lcard::before{top:0;left:0;border-top:2px solid var(--cyan);border-left:2px solid var(--cyan)}
+.lcard::after{bottom:0;right:0;border-bottom:2px solid var(--cyan);border-right:2px solid var(--cyan)}
+.beam{position:absolute;top:0;left:-100%;width:60%;height:1px;background:linear-gradient(90deg,transparent,rgba(0,245,255,0.6),transparent);animation:bscan 3.5s ease-in-out infinite}
+@keyframes bscan{0%{left:-60%}100%{left:100%}}
+
+.fl{font-family:'Share Tech Mono',monospace;font-size:10px;color:rgba(0,245,255,0.5);letter-spacing:2px;text-transform:uppercase;margin-bottom:7px;display:block}
+.fw{position:relative;margin-bottom:16px}
+.fi{width:100%;background:rgba(0,0,0,0.55);border:1px solid rgba(0,245,255,0.15);border-radius:2px;padding:13px 16px;color:var(--text);font-family:'Share Tech Mono',monospace;font-size:13px;letter-spacing:1px;outline:none;transition:all 0.22s}
+.fi:focus{border-color:var(--cyan);box-shadow:0 0 0 2px rgba(0,245,255,0.07),0 0 18px rgba(0,245,255,0.08);background:rgba(0,245,255,0.02)}
+.fi::placeholder{color:var(--muted)}
+.tpw{position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--muted);cursor:pointer;font-size:15px;padding:4px;transition:color 0.2s}
+.tpw:hover{color:var(--cyan)}
+
+.btn-acc{
+  width:100%;border:none;border-radius:2px;padding:15px;color:#000;
+  font-family:'Orbitron',monospace;font-size:11px;font-weight:700;letter-spacing:3px;
+  cursor:pointer;position:relative;overflow:hidden;transition:all 0.3s;
+  background:linear-gradient(135deg,#00f5ff,#0088bb,#7c4dff);background-size:200%;
+  box-shadow:0 0 25px rgba(0,245,255,0.25);
+}
+.btn-acc::before{content:'';position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.2),transparent);transform:translateX(-100%);transition:0.45s}
+.btn-acc:hover::before{transform:translateX(100%)}
+.btn-acc:hover{box-shadow:0 0 50px rgba(0,245,255,0.45);transform:translateY(-2px)}
+.btn-acc:disabled{opacity:0.4;cursor:not-allowed;transform:none}
+
+.lerr{margin-top:12px;padding:10px 15px;background:rgba(255,23,68,0.07);border:1px solid rgba(255,23,68,0.22);border-radius:2px;font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--red);text-align:center;display:none;animation:shake 0.35s ease;letter-spacing:1px}
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-7px)}75%{transform:translateX(7px)}}
+
+/* ══════════ APP ══════════ */
+#appPage{display:none;min-height:100vh;position:relative;z-index:10;padding-bottom:26px}
+
+/* TOPBAR */
+.tbar{position:sticky;top:0;z-index:100;background:rgba(0,0,0,0.72);backdrop-filter:blur(20px);border-bottom:1px solid rgba(0,245,255,0.08);padding:0 18px;display:flex;align-items:center;gap:12px;height:54px}
+.tbl{font-family:'Orbitron',monospace;font-size:15px;font-weight:900;letter-spacing:4px;color:var(--cyan);text-shadow:0 0 12px rgba(0,245,255,0.4);white-space:nowrap}
+.tsep{width:1px;height:26px;background:rgba(0,245,255,0.12)}
+.rbg{display:inline-flex;align-items:center;gap:5px;padding:3px 11px;border-radius:2px;font-family:'Share Tech Mono',monospace;font-size:9px;letter-spacing:2px}
+.ro{background:rgba(255,215,0,0.08);border:1px solid rgba(255,215,0,0.22);color:var(--gold)}
+.rr2{background:rgba(0,245,255,0.06);border:1px solid rgba(0,245,255,0.18);color:var(--cyan)}
+.rdot{width:5px;height:5px;border-radius:50%;animation:hblink 2s infinite}
+.ro .rdot{background:var(--gold);box-shadow:0 0 5px var(--gold)}
+.rr2 .rdot{background:var(--cyan);box-shadow:0 0 5px var(--cyan)}
+.tuser{font-family:'Share Tech Mono',monospace;font-size:10px;color:rgba(0,245,255,0.4);margin-left:auto}
+.bout{background:rgba(255,23,68,0.07);border:1px solid rgba(255,23,68,0.18);border-radius:2px;padding:6px 13px;color:var(--red);font-family:'Share Tech Mono',monospace;font-size:9px;letter-spacing:1px;cursor:pointer;transition:all 0.2s;flex-shrink:0}
+.bout:hover{background:rgba(255,23,68,0.16);box-shadow:0 0 12px rgba(255,23,68,0.15)}
+
+/* BODY */
+.ab{max-width:800px;margin:0 auto;padding:24px 14px 50px;display:flex;flex-direction:column;gap:14px}
+
+/* CARD */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:3px;padding:20px;position:relative;overflow:hidden;backdrop-filter:blur(18px);transition:border-color 0.3s;animation:cfUp 0.45s ease both}
+.card:hover{border-color:rgba(0,245,255,0.22)}
+.card::before{content:'';position:absolute;top:0;left:0;width:2px;height:100%}
+.cc::before{background:linear-gradient(180deg,var(--cyan),transparent)}
+.cg::before{background:linear-gradient(180deg,var(--gold),transparent)}
+.cdeco{position:absolute;pointer-events:none}
+.cdeco.tr{top:0;right:0;width:14px;height:14px;border-top:1px solid rgba(0,245,255,0.25);border-right:1px solid rgba(0,245,255,0.25)}
+.cdeco.bl{bottom:0;left:2px;width:14px;height:14px;border-bottom:1px solid rgba(0,245,255,0.1);border-left:1px solid rgba(0,245,255,0.1)}
+@keyframes cfUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
+
+.stitle{font-family:'Orbitron',monospace;font-size:10px;font-weight:700;color:var(--cyan);letter-spacing:3px;text-transform:uppercase;display:flex;align-items:center;gap:9px;margin-bottom:13px}
+.stitle::after{content:'';flex:1;height:1px;background:linear-gradient(90deg,rgba(0,245,255,0.25),transparent)}
+.stitle.gold{color:var(--gold)}
+.stitle.gold::after{background:linear-gradient(90deg,rgba(255,215,0,0.25),transparent)}
+
+.sbar{display:flex;align-items:center;gap:7px;padding:8px 12px;background:rgba(0,245,255,0.025);border:1px solid rgba(0,245,255,0.07);border-radius:2px;font-family:'Share Tech Mono',monospace;font-size:10px;color:rgba(0,245,255,0.5);margin-bottom:13px}
+.scnt{margin-left:auto;background:rgba(0,245,255,0.07);border:1px solid rgba(0,245,255,0.12);border-radius:20px;padding:1px 9px;font-size:9px;color:var(--cyan)}
+
+/* TOKEN LIST */
+.tklist{display:flex;flex-direction:column;gap:6px;max-height:320px;overflow-y:auto;padding-right:3px}
+.tklist::-webkit-scrollbar{width:2px}
+.tklist::-webkit-scrollbar-thumb{background:rgba(0,245,255,0.15)}
+
+.tki{display:flex;align-items:center;gap:9px;background:rgba(0,0,0,0.45);border:1px solid rgba(0,245,255,0.07);border-radius:2px;padding:9px 12px;transition:all 0.18s;position:relative;overflow:hidden}
+.tki::before{content:'';position:absolute;left:0;top:0;bottom:0;width:2px;background:rgba(0,245,255,0.25)}
+.tki:hover{border-color:rgba(0,245,255,0.18);background:rgba(0,245,255,0.025)}
+
+.tnum{font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--cyan);background:rgba(0,245,255,0.06);border-radius:2px;padding:2px 5px;flex-shrink:0;letter-spacing:1px}
+.tval{font-family:'Share Tech Mono',monospace;font-size:10px;color:rgba(176,224,230,0.75);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tacts{display:flex;gap:2px;flex-shrink:0}
+
+/* RESELLER LIST */
+.relist{display:flex;flex-direction:column;gap:6px;max-height:260px;overflow-y:auto;padding-right:3px;margin-bottom:13px}
+.relist::-webkit-scrollbar{width:2px}
+.relist::-webkit-scrollbar-thumb{background:rgba(255,215,0,0.15)}
+
+.rei{display:flex;align-items:center;gap:11px;background:rgba(0,0,0,0.45);border:1px solid rgba(255,215,0,0.07);border-radius:2px;padding:11px 13px;transition:all 0.18s;position:relative;overflow:hidden}
+.rei::before{content:'';position:absolute;left:0;top:0;bottom:0;width:2px;background:rgba(255,215,0,0.35)}
+.rei:hover{border-color:rgba(255,215,0,0.18);background:rgba(255,215,0,0.018)}
+
+.rav{width:30px;height:30px;flex-shrink:0;background:rgba(255,183,0,0.12);border:1px solid rgba(255,215,0,0.25);border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Orbitron',monospace;font-size:12px;font-weight:700;color:var(--gold);box-shadow:0 0 10px rgba(255,215,0,0.1)}
+.rname{font-family:'Orbitron',monospace;font-size:11px;color:var(--gold);letter-spacing:1px}
+.rpass{font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--muted);margin-top:2px}
+.rbdg{margin-left:auto;font-family:'Share Tech Mono',monospace;font-size:8px;background:rgba(0,255,136,0.06);border:1px solid rgba(0,255,136,0.12);color:var(--green);padding:2px 7px;border-radius:20px;flex-shrink:0;letter-spacing:1px}
+
+/* INPUTS */
+.irow{display:flex;gap:9px;align-items:flex-end;flex-wrap:wrap}
+.igrp{display:flex;flex-direction:column;gap:5px;flex:1;min-width:140px}
+.ilbl{font-family:'Share Tech Mono',monospace;font-size:9px;color:rgba(0,245,255,0.4);letter-spacing:2px;text-transform:uppercase}
+.inp{width:100%;background:rgba(0,0,0,0.5);border:1px solid rgba(0,245,255,0.12);border-radius:2px;padding:10px 13px;color:var(--text);font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:1px;outline:none;transition:all 0.2s}
+.inp:focus{border-color:var(--cyan);box-shadow:0 0 0 2px rgba(0,245,255,0.06)}
+.inp::placeholder{color:var(--muted)}
+
+/* BUTTONS */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:5px;border-radius:2px;border:none;cursor:pointer;font-family:'Orbitron',monospace;font-weight:700;transition:all 0.2s;white-space:nowrap;letter-spacing:1px;position:relative;overflow:hidden}
+.btn:disabled{opacity:0.35;cursor:not-allowed;transform:none!important}
+.btn::after{content:'';position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.15),transparent);transform:translateX(-100%);transition:0.4s}
+.btn:hover:not(:disabled)::after{transform:translateX(100%)}
+.bc{background:linear-gradient(135deg,var(--cyan),var(--cyan2));color:#000;padding:10px 18px;font-size:9px;box-shadow:0 2px 15px rgba(0,245,255,0.15)}
+.bc:hover:not(:disabled){transform:translateY(-1px);box-shadow:var(--gc)}
+.bg2{background:linear-gradient(135deg,var(--gold),var(--gold2));color:#000;padding:10px 18px;font-size:9px}
+.bg2:hover:not(:disabled){transform:translateY(-1px);box-shadow:var(--go)}
+.bgr{background:linear-gradient(135deg,var(--green),var(--green2));color:#000;padding:10px 18px;font-size:9px}
+.bgr:hover:not(:disabled){transform:translateY(-1px);box-shadow:var(--gg)}
+.bgh{background:transparent;color:var(--muted);border:1px solid rgba(0,245,255,0.09);padding:8px 13px;font-size:8px}
+.bgh:hover:not(:disabled){color:var(--text);border-color:rgba(0,245,255,0.22)}
+.bico{background:transparent;border:none;padding:4px 7px;border-radius:2px;font-size:11px;cursor:pointer;color:var(--muted);transition:all 0.15s}
+.bico:hover{background:rgba(255,255,255,0.04);color:var(--text)}
+.bico.del:hover{background:rgba(255,23,68,0.09);color:var(--red)}
+
+/* SAVE */
+.savesec{background:linear-gradient(135deg,rgba(0,245,255,0.035),rgba(124,77,255,0.035));border:1px solid rgba(0,245,255,0.1);border-radius:3px;padding:16px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;backdrop-filter:blur(18px)}
+.save-t{font-family:'Orbitron',monospace;font-size:10px;color:var(--cyan);letter-spacing:2px}
+.save-s{font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--muted);margin-top:3px}
+.brow{display:flex;gap:7px;flex-wrap:wrap}
+
+/* EMPTY */
+.empty{text-align:center;padding:24px;font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--muted)}
+.empi{font-size:24px;opacity:0.25;margin-bottom:6px}
+
+/* SPIN */
+.spin{width:12px;height:12px;border:2px solid rgba(0,0,0,0.15);border-top-color:currentColor;border-radius:50%;animation:sp .6s linear infinite;display:inline-block;flex-shrink:0}
+@keyframes sp{to{transform:rotate(360deg)}}
+
+/* TOAST */
+.toast{position:fixed;bottom:30px;left:50%;transform:translateX(-50%) translateY(70px);background:rgba(3,12,25,0.96);border:1px solid rgba(0,245,255,0.18);border-radius:2px;padding:11px 20px;font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:1px;display:flex;align-items:center;gap:9px;box-shadow:0 8px 40px rgba(0,0,0,0.6),0 0 15px rgba(0,245,255,0.08);z-index:9000;transition:transform 0.4s cubic-bezier(0.34,1.56,0.64,1),opacity 0.3s;opacity:0;max-width:92vw;white-space:nowrap;backdrop-filter:blur(20px)}
+.toast.show{transform:translateX(-50%) translateY(0);opacity:1}
+.toast.ok{border-color:rgba(0,255,136,0.25);color:var(--green)}
+.toast.err{border-color:rgba(255,23,68,0.25);color:var(--red)}
+.toast.inf{border-color:rgba(0,245,255,0.18);color:var(--cyan)}
+
+@media(max-width:500px){
+  .irow{flex-direction:column}
+  .tbl{font-size:12px;letter-spacing:2px}
+  .savesec{flex-direction:column}
+  .tval{font-size:9px}
+}
+</style>
+</head>
+<body>
+
+<canvas id="bgCanvas"></canvas>
+<canvas id="fxCanvas"></canvas>
+<div class="scanlines"></div>
+<div class="vignette"></div>
+<div class="glitch-h"></div>
+<div class="hc tl"></div><div class="hc tr"></div><div class="hc bl"></div><div class="hc br"></div>
+
+<div class="hud">
+  <div class="hdot"></div>
+  <span>SYS.ONLINE</span>
+  <span>◈</span>
+  <span>LUCAS-MGR v2.0</span>
+  <span>◈</span>
+  <span id="hudConn">CONN: GITHUB</span>
+  <div class="htime" id="hudTime">--:--:--</div>
+</div>
+
+<!-- LOADING -->
+<div id="loadingOverlay">
+  <div class="lg-wrap">
+    <div class="lg-title">LUCAS</div>
+  </div>
+  <div class="lg-sub">◈ token management system ◈</div>
+  <div class="lg-bar-w"><div class="lg-bar"></div></div>
+  <div class="lg-pct" id="lgPct">0%</div>
+  <div class="lg-log" id="lgLog"></div>
+</div>
+
+<!-- LOGIN -->
+<div id="loginPage">
+  <div class="lw">
+    <div class="lh">
+      <div class="hex-logo">
+        <div class="hex-r2"></div><div class="hex-r1"></div>
+        <div class="hex-in">L</div>
+      </div>
+      <div class="ln">LUCAS</div>
+    </div>
+    <div class="lcard">
+      <div class="beam"></div>
+      <label class="fl">▸ USERNAME</label>
+      <div class="fw">
+        <input class="fi" type="text" id="loginUser" placeholder="enter username..." autocomplete="off" onkeydown="if(event.key==='Enter')document.getElementById('loginPass').focus()">
+      </div>
+      <label class="fl">▸ PASSWORD</label>
+      <div class="fw">
+        <input class="fi" type="password" id="loginPass" placeholder="enter password..." autocomplete="off" onkeydown="if(event.key==='Enter')doLogin()">
+        <button class="tpw" onclick="togglePw()" id="tpwBtn">👁</button>
+      </div>
+      <button class="btn-acc" onclick="doLogin()" id="loginBtn">◈ ACCESS SYSTEM ◈</button>
+      <div class="lerr" id="lerr">⚠ INVALID CREDENTIALS — ACCESS DENIED</div>
+    </div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="appPage">
+  <div class="tbar">
+    <div class="tbl">LUCAS</div>
+    <div class="tsep"></div>
+    <div id="roleBadge" class="rbg ro"><div class="rdot"></div><span id="roleLabel">OWNER</span></div>
+    <div class="tuser" id="topUser">@Lucas</div>
+    <button class="bout" onclick="doLogout()">⏻ LOGOUT</button>
+  </div>
+
+  <div class="ab">
+
+    <!-- Token List -->
+    <div class="card cc">
+      <div class="cdeco tr"></div><div class="cdeco bl"></div>
+      <div class="stitle">◈ Telegram Bot Tokens</div>
+      <div class="sbar">
+        <span id="statusText">Memuat...</span>
+        <span class="scnt" id="tokenCount">0 token</span>
+      </div>
+      <div class="tklist" id="tokenList">
+        <div class="empty"><div class="empi">⏳</div>Memuat data...</div>
+      </div>
+    </div>
+
+    <!-- Add Token -->
+    <div class="card cc" style="animation-delay:.05s">
+      <div class="cdeco tr"></div>
+      <div class="stitle">◈ Tambah Token Bot</div>
+      <div class="irow">
+        <div class="igrp">
+          <label class="ilbl">▸ Bot Token</label>
+          <input class="inp" type="text" id="newToken" placeholder="123456789:AAHxxxxxxxxxxxxxxxxxxx" onkeydown="if(event.key==='Enter')addToken()">
+        </div>
+        <button class="btn bc" onclick="addToken()">+ ADD TOKEN</button>
+      </div>
+    </div>
+
+    <!-- Reseller -->
+    <div class="card cg" id="resellerCard" style="animation-delay:.1s">
+      <div class="cdeco tr"></div>
+      <div class="stitle gold">◈ Reseller Management</div>
+      <div class="sbar" style="background:rgba(255,215,0,0.025);border-color:rgba(255,215,0,0.07);color:rgba(255,215,0,0.45)">
+        <span id="resStatusText">Loading...</span>
+        <span class="scnt" style="background:rgba(255,215,0,0.07);border-color:rgba(255,215,0,0.12);color:var(--gold)" id="resCount">0 reseller</span>
+      </div>
+      <div class="relist" id="resellerList">
+        <div class="empty"><div class="empi">👥</div>Belum ada reseller</div>
+      </div>
+      <div style="border-top:1px solid rgba(255,215,0,0.07);padding-top:14px;margin-top:2px">
+        <div class="stitle gold" style="font-size:8px;margin-bottom:10px">◈ Tambah Reseller Baru</div>
+        <div class="irow">
+          <div class="igrp">
+            <label class="ilbl" style="color:rgba(255,215,0,0.4)">▸ Username</label>
+            <input class="inp" style="border-color:rgba(255,215,0,0.1)" type="text" id="resUser" placeholder="username reseller">
+          </div>
+          <div class="igrp">
+            <label class="ilbl" style="color:rgba(255,215,0,0.4)">▸ Password</label>
+            <input class="inp" style="border-color:rgba(255,215,0,0.1)" type="text" id="resPass" placeholder="password reseller">
+          </div>
+          <button class="btn bg2" onclick="addReseller()">+ ADD</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Save -->
+    <div class="savesec" style="animation:cfUp 0.45s ease 0.15s both">
+      <div style="flex:1">
+        <div class="save-t">◈ Push Changes to GitHub</div>
+        <div class="save-s" id="saveSubText">Simpan semua perubahan ke repository</div>
+      </div>
+      <div class="brow">
+        <button class="btn bgr" onclick="saveAll()" id="saveBtn">⬆ PUSH TO GITHUB</button>
+        <button class="btn bgh" onclick="refreshData()">↺ REFRESH</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ═══════════════════════════════════
+// ⬇️  GANTI GH_TOKEN DI BAWAH INI
+const GH_TOKEN = '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';
+// ═══════════════════════════════════
+const OWNER_CRED={username:'Lucas',password:'rere',role:'owner'};
+const GH_OWNER='mhmmdferdi139-cloud',GH_REPO='tokens.json',GH_FILE='tokens.json',GH_BRANCH='main';
+const API_URL=`https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/contents/${GH_FILE}`;
+let tokens=[],resellers=[],fileSha='',isDirty=false,currentUser=null;
+
+// ═══ HUD CLOCK ═══
+setInterval(()=>{document.getElementById('hudTime').textContent=new Date().toLocaleTimeString('id-ID',{hour12:false})},1000);
+
+// ═══════════════════════════════════
+// MATRIX RAIN BG
+// ═══════════════════════════════════
+(function(){
+  const c=document.getElementById('bgCanvas');
+  const ctx=c.getContext('2d');
+  const chars='アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ@#$%&<>/|\\';
+  const fs=13;
+  let W,H,cols,drops;
+  function resize(){W=c.width=window.innerWidth;H=c.height=window.innerHeight;cols=Math.floor(W/fs);drops=Array.from({length:cols},()=>Math.random()*-150)}
+  resize();window.addEventListener('resize',resize);
+  const palette=['#00f5ff','#00bcd4','#0088aa','#005577','#002233','#00ff88','#006633','#001a0a'];
+  function frame(){
+    ctx.fillStyle='rgba(0,0,0,0.045)';
+    ctx.fillRect(0,0,W,H);
+    for(let i=0;i<cols;i++){
+      const y=drops[i]*fs;
+      const lead=Math.random()>0.5;
+      if(lead){ctx.fillStyle='rgba(200,255,255,0.95)';ctx.shadowColor='#00f5ff';ctx.shadowBlur=12}
+      else{ctx.fillStyle=palette[Math.floor(Math.random()*palette.length)];ctx.shadowBlur=0}
+      ctx.font=`${fs}px 'Share Tech Mono',monospace`;
+      ctx.fillText(chars[Math.floor(Math.random()*chars.length)],i*fs,y);
+      ctx.shadowBlur=0;
+      if(y>H&&Math.random()>0.975)drops[i]=0;else drops[i]+=0.45;
+    }
+  }
+  setInterval(frame,32);
+})();
+
+// ═══════════════════════════════════
+// FX CANVAS — particles + beams + glitch bursts
+// ═══════════════════════════════════
+(function(){
+  const c=document.getElementById('fxCanvas');
+  const ctx=c.getContext('2d');
+  let W,H;
+  function resize(){W=c.width=window.innerWidth;H=c.height=window.innerHeight}
+  resize();window.addEventListener('resize',resize);
+
+  const pts=Array.from({length:55},()=>({
+    x:Math.random()*window.innerWidth,y:Math.random()*window.innerHeight,
+    vx:(Math.random()-.5)*.35,vy:(Math.random()-.5)*.35,
+    r:Math.random()*1.4+.4,pa:Math.random()*Math.PI*2,
+    col:Math.random()>.65?'0,255,136':'0,245,255'
+  }));
+
+  const beams=Array.from({length:4},()=>({
+    y:Math.random()*window.innerHeight,
+    spd:(Math.random()*.25+.08)*(Math.random()>.5?1:-1),
+    a:Math.random()*.25+.05
+  }));
+
+  let glitch={active:false,timer:0,x:0,y:0,w:0,h:0};
+
+  function frame(){
+    ctx.clearRect(0,0,W,H);
+
+    // particles
+    pts.forEach(p=>{
+      p.x+=p.vx;p.y+=p.vy;p.pa+=0.018;
+      const a=.2+Math.sin(p.pa)*.2;
+      if(p.x<0)p.x=W;if(p.x>W)p.x=0;if(p.y<0)p.y=H;if(p.y>H)p.y=0;
+      ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);
+      ctx.fillStyle=`rgba(${p.col},${a})`;
+      ctx.shadowColor=`rgba(${p.col},.5)`;ctx.shadowBlur=5;
+      ctx.fill();ctx.shadowBlur=0;
+    });
+
+    // scan beams
+    beams.forEach(b=>{
+      b.y+=b.spd;
+      if(b.y<0)b.y=H;if(b.y>H)b.y=0;
+      const g=ctx.createLinearGradient(0,b.y-2,0,b.y+2);
+      g.addColorStop(0,'transparent');g.addColorStop(.5,`rgba(0,245,255,${b.a*.12})`);g.addColorStop(1,'transparent');
+      ctx.fillStyle=g;ctx.fillRect(0,b.y-3,W,6);
+    });
+
+    // random glitch burst
+    if(Math.random()<.004){
+      const y=Math.random()*H;
+      const w=Math.random()*350+80;
+      const x=Math.random()*(W-w);
+      ctx.fillStyle=`rgba(0,245,255,${Math.random()*.05})`;
+      ctx.fillRect(x,y,w,Math.random()*4+1);
+      // color shift glitch
+      if(Math.random()>.5){
+        ctx.fillStyle=`rgba(255,0,64,${Math.random()*.04})`;
+        ctx.fillRect(x+Math.random()*20,y+Math.random()*10,w*.6,Math.random()*2);
+      }
+    }
+
+    // horizontal data line sweep
+    if(Math.random()<.01){
+      const y=Math.random()*H;
+      ctx.strokeStyle=`rgba(0,245,255,${Math.random()*.08})`;
+      ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();
+    }
+  }
+  setInterval(frame,16);
+})();
+
+// ═══════════════════════════════════
+// TOAST
+// ═══════════════════════════════════
+function toast(msg,type='inf',dur=3500){
+  const el=document.getElementById('toast');
+  el.className=`toast ${type}`;
+  el.innerHTML=`<span>${{ok:'✅',err:'❌',inf:'◈'}[type]}</span> ${msg}`;
+  el.classList.add('show');clearTimeout(el._t);
+  el._t=setTimeout(()=>el.classList.remove('show'),dur);
+}
+
+// ═══════════════════════════════════
+// LOGIN
+// ═══════════════════════════════════
+function togglePw(){
+  const i=document.getElementById('loginPass'),b=document.getElementById('tpwBtn');
+  i.type=i.type==='password'?'text':'password';b.textContent=i.type==='password'?'👁':'🙈';
+}
+function doLogin(){
+  const u=document.getElementById('loginUser').value.trim();
+  const p=document.getElementById('loginPass').value.trim();
+  const err=document.getElementById('lerr'),btn=document.getElementById('loginBtn');
+  if(!u||!p){err.style.display='block';err.textContent='⚠ USERNAME & PASSWORD WAJIB DIISI';return}
+  if(u===OWNER_CRED.username&&p===OWNER_CRED.password){currentUser={username:u,role:'owner'};startApp();return}
+  const found=resellers.find(r=>r.username===u&&r.password===p);
+  if(found){currentUser={username:u,role:'reseller'};startApp();return}
+  btn.disabled=true;err.style.display='block';err.textContent='⚠ INVALID CREDENTIALS — ACCESS DENIED';
+  setTimeout(()=>btn.disabled=false,2000);
+}
+function startApp(){
+  document.getElementById('loginPage').style.display='none';
+  document.getElementById('appPage').style.display='block';
+  const isOwner=currentUser.role==='owner';
+  const badge=document.getElementById('roleBadge');
+  badge.className='rbg '+(isOwner?'ro':'rr2');
+  document.getElementById('roleLabel').textContent=isOwner?'OWNER':'RESELLER';
+  document.getElementById('topUser').textContent='@'+currentUser.username;
+  document.getElementById('resellerCard').style.display=isOwner?'':'none';
+  renderTokens();if(isOwner)renderResellers();
+}
+function doLogout(){
+  currentUser=null;
+  document.getElementById('appPage').style.display='none';
+  document.getElementById('loginPage').style.display='flex';
+  document.getElementById('loginUser').value='';document.getElementById('loginPass').value='';
+  document.getElementById('lerr').style.display='none';
+}
+
+// ═══════════════════════════════════
+// GITHUB API
+// ═══════════════════════════════════
+async function loadData(){
+  try{
+    const res=await fetch(`${API_URL}?ref=${GH_BRANCH}&t=${Date.now()}`,{headers:{'Authorization':`Bearer ${GH_TOKEN}`,'Accept':'application/vnd.github.v3+json'}});
+    if(!res.ok)throw new Error(`GitHub API ${res.status}`);
+    const data=await res.json();
+    fileSha=data.sha;
+    const raw=JSON.parse(decodeURIComponent(escape(atob(data.content.replace(/\n/g,'')))));
+    tokens=Array.isArray(raw.tokens)?raw.tokens:[];
+    resellers=Array.isArray(raw.resellers)?raw.resellers:[];
+    isDirty=false;
+    document.getElementById('hudConn').textContent='CONN: GITHUB ✓';
+    return true;
+  }catch(e){
+    document.getElementById('hudConn').textContent='CONN: ERROR ✗';
+    toast('Gagal load: '+e.message,'err',6000);return false;
+  }
+}
+async function saveAll(){
+  if(!fileSha){toast('Load data dulu!','err');return}
+  const btn=document.getElementById('saveBtn');
+  btn.disabled=true;btn.innerHTML='<div class="spin"></div> PUSHING...';
+  try{
+    const encoded=btoa(unescape(encodeURIComponent(JSON.stringify({tokens,resellers},null,2))));
+    const res=await fetch(API_URL,{method:'PUT',headers:{'Authorization':`Bearer ${GH_TOKEN}`,'Accept':'application/vnd.github.v3+json','Content-Type':'application/json'},body:JSON.stringify({message:`[Lucas] Update — ${new Date().toISOString()}`,content:encoded,sha:fileSha,branch:GH_BRANCH})});
+    if(res.status===409)throw new Error('Konflik — Refresh dulu lalu push ulang');
+    if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e.message||`Error ${res.status}`)}
+    const d=await res.json();fileSha=d.content.sha;isDirty=false;
+    document.getElementById('statusText').textContent='✓ Tersinkron ke GitHub';
+    document.getElementById('saveSubText').textContent='Last push: '+new Date().toLocaleTimeString('id-ID');
+    toast(`Push OK! (${tokens.length} token, ${resellers.length} reseller)`,'ok');
+  }catch(e){toast(e.message,'err',6000)}
+  finally{btn.disabled=false;btn.innerHTML='⬆ PUSH TO GITHUB'}
+}
+async function refreshData(){
+  toast('Memuat ulang...','inf');
+  const ok=await loadData();
+  if(ok){renderTokens();if(currentUser?.role==='owner')renderResellers();toast('Data dimuat ulang!','ok')}
+}
+
+// ═══════════════════════════════════
+// TOKENS
+// ═══════════════════════════════════
+function renderTokens(){
+  const list=document.getElementById('tokenList');
+  document.getElementById('tokenCount').textContent=`${tokens.length} token`;
+  document.getElementById('statusText').textContent=`✓ ${tokens.length} token aktif`;
+  if(!tokens.length){list.innerHTML=`<div class="empty"><div class="empi">🤖</div>Belum ada token</div>`;return}
+  list.innerHTML=tokens.map((t,i)=>`
+    <div class="tki">
+      <span class="tnum">#${String(i+1).padStart(2,'0')}</span>
+      <span class="tval" title="${t}">${t}</span>
+      <div class="tacts">
+        <button class="bico" onclick="copyToken(${i})">📋</button>
+        <button class="bico del" onclick="removeToken(${i})">✕</button>
+      </div>
+    </div>`).join('');
+}
+function addToken(){
+  const inp=document.getElementById('newToken'),val=inp.value.trim();
+  if(!val){toast('Masukkan token!','err');return}
+  if(!/^\d+:[A-Za-z0-9_-]{20,}$/.test(val)){toast('Format tidak valid! Contoh: 123456:AAH...','err',4000);return}
+  if(tokens.includes(val)){toast('Token sudah ada!','err');return}
+  tokens.push(val);inp.value='';isDirty=true;renderTokens();
+  document.getElementById('saveSubText').textContent='⚠ +1 token — belum disimpan';
+  toast('Token ditambahkan! Push ke GitHub.','ok');
+  document.getElementById('tokenList').scrollTop=99999;
+}
+function removeToken(i){
+  tokens.splice(i,1);isDirty=true;renderTokens();
+  document.getElementById('saveSubText').textContent='⚠ Token dihapus — belum disimpan';
+  toast('Token dihapus.','inf');
+}
+function copyToken(i){
+  navigator.clipboard.writeText(tokens[i]).then(()=>toast('Dicopy!','ok')).catch(()=>{
+    const ta=document.createElement('textarea');ta.value=tokens[i];document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);toast('Dicopy!','ok');
+  });
+}
+
+// ═══════════════════════════════════
+// RESELLERS
+// ═══════════════════════════════════
+function renderResellers(){
+  const list=document.getElementById('resellerList');
+  document.getElementById('resCount').textContent=`${resellers.length} reseller`;
+  document.getElementById('resStatusText').textContent=`✓ ${resellers.length} terdaftar`;
+  if(!resellers.length){list.innerHTML=`<div class="empty"><div class="empi">👥</div>Belum ada reseller</div>`;return}
+  list.innerHTML=resellers.map((r,i)=>`
+    <div class="rei">
+      <div class="rav">${r.username.charAt(0).toUpperCase()}</div>
+      <div><div class="rname">@${r.username}</div><div class="rpass">pass: ${r.password}</div></div>
+      <div class="rbdg">RESELLER</div>
+      <div class="tacts" style="margin-left:6px"><button class="bico del" onclick="removeReseller(${i})">✕</button></div>
+    </div>`).join('');
+}
+function addReseller(){
+  const u=document.getElementById('resUser').value.trim(),p=document.getElementById('resPass').value.trim();
+  if(!u||!p){toast('Username & password wajib!','err');return}
+  if(u===OWNER_CRED.username){toast('Sama dengan username Owner!','err');return}
+  if(resellers.find(r=>r.username===u)){toast('Username sudah terdaftar!','err');return}
+  if(u.length<3||p.length<3){toast('Min. 3 karakter!','err');return}
+  resellers.push({username:u,password:p});
+  document.getElementById('resUser').value='';document.getElementById('resPass').value='';
+  isDirty=true;renderResellers();
+  document.getElementById('saveSubText').textContent=`⚠ @${u} ditambahkan — belum disimpan`;
+  toast(`Reseller @${u} ditambahkan! Push ke GitHub.`,'ok');
+}
+function removeReseller(i){
+  const name=resellers[i].username;resellers.splice(i,1);isDirty=true;renderResellers();
+  document.getElementById('saveSubText').textContent=`⚠ @${name} dihapus — belum disimpan`;
+  toast(`@${name} dihapus.`,'inf');
+}
+window.addEventListener('beforeunload',e=>{if(isDirty){e.preventDefault();e.returnValue=''}});
+
+// ═══════════════════════════════════
+// BOOT SEQUENCE
+// ═══════════════════════════════════
+const BOOT_LOGS=[
+  '> INITIALIZING LUCAS CORE v2.0...',
+  '> ESTABLISHING SECURE CHANNEL...',
+  '> CONNECTING TO GITHUB API...',
+  '> FETCHING ENCRYPTED VAULT...',
+  '> DECRYPTING TOKEN DATABASE...',
+  '> LOADING CREDENTIAL MATRIX...',
+  '> ALL SYSTEMS NOMINAL ✓'
+];
+async function boot(){
+  const logEl=document.getElementById('lgLog');
+  const pctEl=document.getElementById('lgPct');
+  for(let i=0;i<BOOT_LOGS.length-1;i++){
+    await new Promise(r=>setTimeout(r,260));
+    const d=document.createElement('div');d.textContent=BOOT_LOGS[i];logEl.appendChild(d);
+    if(logEl.children.length>4)logEl.removeChild(logEl.firstChild);
+    pctEl.textContent=Math.round((i+1)/(BOOT_LOGS.length)*65)+'%';
+  }
+  await loadData();
+  pctEl.textContent='100%';
+  const last=document.createElement('div');last.textContent=BOOT_LOGS[BOOT_LOGS.length-1];last.style.color='rgba(0,255,136,0.5)';logEl.appendChild(last);
+  await new Promise(r=>setTimeout(r,500));
+  const ov=document.getElementById('loadingOverlay');
+  ov.style.transition='opacity 0.6s ease';ov.style.opacity='0';
+  setTimeout(()=>{ov.style.display='none';document.getElementById('loginPage').style.display='flex'},600);
+}
+window.addEventListener('DOMContentLoaded',boot);
+</script>
+</body>
+</html>
